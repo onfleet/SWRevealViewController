@@ -202,6 +202,33 @@ static CGFloat scaledValue( CGFloat v1, CGFloat min2, CGFloat max2, CGFloat min1
 
 
 # pragma mark - overrides
+- (void)willMoveToSuperview:(nullable UIView *)newSuperview {
+    [super willMoveToSuperview:newSuperview];
+    if (self.superview == nil) {
+        return;
+    }
+    // filter all indexes for constraints that have SWRevealView class as first or second item
+    NSIndexSet *indexSet = [self.superview.constraints indexesOfObjectsPassingTest:^BOOL(NSLayoutConstraint *constraint, NSUInteger idx, BOOL *stop) {
+        return constraint.firstItem == self || constraint.secondItem == self;
+    }];
+    // filter all constraints for corresponding indexes
+    NSArray<NSLayoutConstraint *> *constraints = [self.superview.constraints objectsAtIndexes:indexSet];
+    // remove all constraints that are related to this instance before it's moved to the another superview
+    [self.superview removeConstraints:constraints];
+}
+
+- (void)didMoveToSuperview {
+    [super didMoveToSuperview];
+    if (self.superview == nil) {
+        return;
+    }
+    UIView *superview = self.superview;
+    // add all constraints to clip around superview without any margin or insets
+    [NSLayoutConstraint activateConstraints:@[[self.leftAnchor constraintEqualToAnchor:superview.leftAnchor],
+                                              [self.rightAnchor constraintEqualToAnchor:superview.rightAnchor],
+                                              [self.topAnchor constraintEqualToAnchor:superview.topAnchor],
+                                              [self.bottomAnchor constraintEqualToAnchor:superview.bottomAnchor]]];
+}
 
 - (void)layoutSubviews
 {
@@ -713,8 +740,9 @@ const int FrontViewPositionNone = 0xff;
     // create a custom content view for the controller
     _contentView = [[SWRevealView alloc] initWithFrame:frame controller:self];
     
-    // set the content view to resize along with its superview
-    [_contentView setAutoresizingMask:UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight];
+    // disable translating autoresizing masks into constraints
+    // specific constraints are provided by SWRevealView when the view is attached into hierarchy
+    _contentView.translatesAutoresizingMaskIntoConstraints = NO;
     
     // set the content view to clip its bounds if requested
     [_contentView setClipsToBounds:_clipsViewsToBounds];
